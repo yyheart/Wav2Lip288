@@ -85,17 +85,15 @@ def train(device, model, train_data_loader, optimizer,
                 ]
                 # print(x.shape)  # [64, 15, 192, 384]
                 # loss = cosine_loss(a, v, y)
-                # mouth region    可以在dataloder中crop出来或者提前做好
-                # hubert_feature  怎么来，输入语音得到特征，怎么来取这个特征
+                # mouth region    
+                # hubert_feature  
                 sync_score = model(fake_out_clip_mouth, deep_speech_full)
                 sync_score = sync_score.cuda()
-                loss_sync = (  # * args.lamb_syncnet_perception 这个权重没必要加
+                loss_sync = (  
                     criterionMSE(sync_score, real_tensor.expand_as(sync_score))
                 )
-                loss_sync = ""
                 loss_sync.backward()
                 optimizer.step()
-
 
                 global_step += 1
                 running_loss += loss_sync.item()
