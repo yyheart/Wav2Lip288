@@ -1,0 +1,1 @@
+CUDA_VISIBLE_DEVICES=0 python inference.py --checkpoint_path /mnt/sdb/liwen/wav2lip_288x288/checkpoints/wav2lip_finetune/sam/gen_checkpoint_384_4_000285000_2024-01-07.pth --face /mnt/sdb/liwen/wav2lip_288x288/test_data/output.mp4 --audio /mnt/sdb/liwen/wav2lip_288x288/test_data/chinese_news.wav
