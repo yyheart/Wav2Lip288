@@ -42,13 +42,13 @@ best_loss = 1000
 print('use_cuda: {}'.format(use_cuda))
 criterionMSE = nn.MSELoss().cuda()
 real_tensor = torch.tensor(1.0).cuda()
+logloss = nn.BCELoss().cuda()
 
 opt = DINetTrainingOptions().parse_args()
 train_data = DINetDataset(opt.train_data, opt.augment_num, opt.mouth_region_size)
 
 def train(device, model, train_data_loader, optimizer,
           checkpoint_dir=None, checkpoint_interval=None, nepochs=None):
-    
     global global_step, global_epoch
     resumed_step = global_step
     logger = CSVLogger(args.history_train, name=args.exp_num)
@@ -63,19 +63,19 @@ def train(device, model, train_data_loader, optimizer,
                 st = time()
                 model.train()
                 (
-                    source_clip_mask,
+                    source_clip,
                     deep_speech_full
                 ) = data
                 # to cuda
                 deep_speech_full = deep_speech_full.float().cuda()
                 optimizer.zero_grad()
-                source_clip_mask = (
-                    torch.cat(torch.split(source_clip_mask, 1, dim=1), 0)
+                source_clip = (
+                    torch.cat(torch.split(source_clip, 1, dim=1), 0)
                     .squeeze(1)
                     .float()
                     .cuda()
                 )
-                fake_out_clip = torch.cat(torch.split(source_clip_mask, opt.batch_size, dim=0), 1)
+                fake_out_clip = torch.cat(torch.split(source_clip, opt.batch_size, dim=0), 1)
                 fake_out_clip_mouth = fake_out_clip[
                     :, # B
                     :, # C
@@ -83,20 +83,22 @@ def train(device, model, train_data_loader, optimizer,
                     train_data.radius_1_4 : train_data.radius_1_4
                     + train_data.mouth_region_size,
                 ]
-                # print(x.shape)  # [64, 15, 192, 384]
-                # loss = cosine_loss(a, v, y)
                 # mouth region    
-                # hubert_feature  
+                # hubert_feature  replace
                 sync_score = model(fake_out_clip_mouth, deep_speech_full)
                 sync_score = sync_score.cuda()
-                loss_sync = (  
-                    criterionMSE(sync_score, real_tensor.expand_as(sync_score))
-                )
+                # print(sync_score.shape)  # wrong size!!torch.Size([24, 1, 2, 2])
+                # should be  ([B, 1, 8, 8])
+                loss_sync = logloss(sync_score, real_tensor.expand_as(sync_score))
+                # loss_sync = (  
+                #     criterionMSE(sync_score, real_tensor.expand_as(sync_score))
+                # )
                 loss_sync.backward()
                 optimizer.step()
 
                 global_step += 1
                 running_loss += loss_sync.item()
+                
                 print(f"Step {global_step} | Loss: {running_loss/(step+1):.8f} | Elapsed: {(time() - st):.5f}")
                 if global_step % 500 == 0:
                     save_checkpoint(model, optimizer, global_step, checkpoint_dir, global_epoch)
@@ -129,6 +131,8 @@ def save_ckpt(model, optimizer, step, checkpoint_dir, epoch, model_name):
     }, checkpoint_path)
     print("Saved checkpoint:", checkpoint_path)
 
+
+#  remove the evaluate part
 
 def save_checkpoint(model, optimizer, step, checkpoint_dir, epoch):
     # save best.pth
@@ -183,7 +187,6 @@ def load_checkpoint(path, model, optimizer, reset_optimizer=False):
 
 def run():
     # global global_step
-
     checkpoint_dir = os.path.join(args.checkpoint_dir, args.exp_num)
     checkpoint_path = args.checkpoint_path
 
@@ -216,7 +219,6 @@ def run():
         load_checkpoint(checkpoint_path, model, optimizer, reset_optimizer=False)
     else:
         print("Training From Scratch !!!")
-
     train(device, model, training_data_loader, optimizer,
           checkpoint_dir=checkpoint_dir,
           checkpoint_interval=hparams.syncnet_checkpoint_interval,
