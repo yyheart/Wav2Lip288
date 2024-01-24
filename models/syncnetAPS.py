@@ -123,7 +123,7 @@ class DownBlock2d(nn.Module):
     """
     def __init__(self, in_features, out_features, kernel_size=3, padding=1, groups=1, circular_pad = False, apspool_criterion = 'l2', N=None, stride=2):
         super(DownBlock2d, self).__init__()
-        self.conv = nn.Conv2d(
+        self.conv = nn.Conv2d(  # 在没有显示的指定卷积的情况下，stride=1
             in_channels=in_features,
             out_channels=out_features,
             kernel_size=kernel_size,
@@ -196,31 +196,30 @@ class FaceEncoder(nn.Module):
     """
     image encoder
     """
-
     def __init__(self, in_channel, out_dim):
         super(FaceEncoder, self).__init__()
         self.in_channel = in_channel
         self.out_dim = out_dim
         self.face_conv = nn.Sequential(
-            SameBlock2d(in_channel, 64, kernel_size=7, padding=3),
+            SameBlock2d(in_channel, 64, kernel_size=7, padding=3),  # 29 64 7 3
             # # 64 → 32
-            ResBlock2d(64, 64, kernel_size=3, padding=1),
-            DownBlock2d(64, 64, 3, 1),  
+            ResBlock2d(64, 64, kernel_size=3, padding=1),   # 64 64 3 1
+            DownBlock2d(64, 64, 3, 1),  # 64 64 
             SameBlock2d(64, 128),
             # 32 → 16
-            ResBlock2d(128, 128, kernel_size=3, padding=1),
+            ResBlock2d(128, 128, kernel_size=3, padding=1), # 
             DownBlock2d(128, 128, 3, 1),
             SameBlock2d(128, 128),
             # 16 → 8
-            ResBlock2d(128, 128, kernel_size=3, padding=1),
+            ResBlock2d(128, 128, kernel_size=3, padding=1), # 
             DownBlock2d(128, 128, 3, 1),
             SameBlock2d(128, 128),
             # 8 → 4
-            ResBlock2d(128, 128, kernel_size=3, padding=1),
+            ResBlock2d(128, 128, kernel_size=3, padding=1), # 
             DownBlock2d(128, 128, 3, 1),
             SameBlock2d(128, 128),
             # 4 → 2
-            ResBlock2d(128, 128, kernel_size=3, padding=1),
+            ResBlock2d(128, 128, kernel_size=3, padding=1), # 
             DownBlock2d(128, 128, 3, 1),
             SameBlock2d(128, out_dim, kernel_size=1, padding=0),
         )
@@ -279,6 +278,7 @@ class SyncNet(nn.Module):
             nn.LeakyReLU(0.2),
             nn.Conv2d(out_dim, 1, kernel_size=3, padding=1),
         )
+        self.simoid = nn.Sigmoid()
     
 
     def forward(self, image, audio):
@@ -291,7 +291,8 @@ class SyncNet(nn.Module):
         )
         concat_embedding = torch.cat([image_embedding, audio_embedding], 1)
         out_score = self.merge_encoder(concat_embedding)
-        return out_score
+        out_score_normal = self.simoid(out_score)
+        return out_score_normal
 
 
 class SyncNetPerception(nn.Module):
