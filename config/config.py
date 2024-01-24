@@ -101,7 +101,7 @@ class DINetTrainingOptions:
             "--augment_num", type=int, default=32, help="augment training data"
         )
         self.parser.add_argument(
-            "--mouth_region_size", type=int, default=64, help="augment training data"
+            "--mouth_region_size", type=int, default=256, help="augment training data"
         )
         self.parser.add_argument(
             "--train_data",

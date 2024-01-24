@@ -43,6 +43,7 @@ print('use_cuda: {}'.format(use_cuda))
 criterionMSE = nn.MSELoss().cuda()
 real_tensor = torch.tensor(1.0).cuda()
 logloss = nn.BCELoss().cuda()
+debug_list = []
 
 opt = DINetTrainingOptions().parse_args()
 train_data = DINetDataset(opt.train_data, opt.augment_num, opt.mouth_region_size)
@@ -66,15 +67,16 @@ def train(device, model, train_data_loader, optimizer,
                     source_clip,
                     deep_speech_full
                 ) = data
+                print("source_clip", source_clip.shape) # [24, 5, 3, 104, 80]
                 # to cuda
                 deep_speech_full = deep_speech_full.float().cuda()
-                optimizer.zero_grad()
                 source_clip = (
                     torch.cat(torch.split(source_clip, 1, dim=1), 0)
                     .squeeze(1)
                     .float()
                     .cuda()
                 )
+                print("source_clip", source_clip.shape)  # torch.Size([120, 3, 104, 80])
                 fake_out_clip = torch.cat(torch.split(source_clip, opt.batch_size, dim=0), 1)
                 fake_out_clip_mouth = fake_out_clip[
                     :, # B
@@ -83,19 +85,23 @@ def train(device, model, train_data_loader, optimizer,
                     train_data.radius_1_4 : train_data.radius_1_4
                     + train_data.mouth_region_size,
                 ]
+                print("fake_out_clip_mouth", fake_out_clip_mouth.shape) # torch.Size([24, 15, 256, 256])
                 # mouth region    
-                # hubert_feature  replace
-                sync_score = model(fake_out_clip_mouth, deep_speech_full)
+                # hubert_feature  replace 
+                sync_score = model(fake_out_clip_mouth, deep_speech_full) # need be 0~1
                 sync_score = sync_score.cuda()
-                # print(sync_score.shape)  # wrong size!!torch.Size([24, 1, 2, 2])
+                optimizer.zero_grad()
                 # should be  ([B, 1, 8, 8])
                 loss_sync = logloss(sync_score, real_tensor.expand_as(sync_score))
+                
+                # debug_list.append
+                # return debug_list
+                # print(loss_sync)
                 # loss_sync = (  
                 #     criterionMSE(sync_score, real_tensor.expand_as(sync_score))
                 # )
                 loss_sync.backward()
                 optimizer.step()
-
                 global_step += 1
                 running_loss += loss_sync.item()
                 
@@ -130,8 +136,6 @@ def save_ckpt(model, optimizer, step, checkpoint_dir, epoch, model_name):
         "best_loss": best_loss,
     }, checkpoint_path)
     print("Saved checkpoint:", checkpoint_path)
-
-
 #  remove the evaluate part
 
 def save_checkpoint(model, optimizer, step, checkpoint_dir, epoch):
@@ -223,7 +227,6 @@ def run():
           checkpoint_dir=checkpoint_dir,
           checkpoint_interval=hparams.syncnet_checkpoint_interval,
           nepochs=hparams.nepochs)
-
 
 if __name__ == "__main__":
     run()
