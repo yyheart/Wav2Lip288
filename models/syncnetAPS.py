@@ -278,7 +278,7 @@ class SyncNet(nn.Module):
             nn.LeakyReLU(0.2),
             nn.Conv2d(out_dim, 1, kernel_size=3, padding=1),
         )
-        self.simoid = nn.Sigmoid()
+        self.sigmoid = nn.Sigmoid()
     
 
     def forward(self, image, audio):
@@ -291,7 +291,7 @@ class SyncNet(nn.Module):
         )
         concat_embedding = torch.cat([image_embedding, audio_embedding], 1)
         out_score = self.merge_encoder(concat_embedding)
-        out_score_normal = self.simoid(out_score)
+        out_score_normal = self.sigmoid(out_score)
         return out_score_normal
 
 
